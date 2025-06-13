@@ -493,7 +493,8 @@
             </div>
 
             <div class="data-storage-info">
-                <strong>📊 Data Storage:</strong> Your survey responses are automatically saved locally and can be exported as CSV. For production use, responses would be stored in a secure database.
+                <strong>📧 Email Delivery:</strong> Survey responses are automatically sent to vennela.gedipudi@gmail.com and stored locally for backup. 
+                <br><small>Responses are also saved locally and can be exported as CSV if needed.</small>
             </div>
             
             <button type="submit" class="submit-btn">Submit My Testimonial</button>
@@ -506,12 +507,19 @@
             
             <div class="error-message" id="errorMessage">
                 <h3>Submission Error</h3>
-                <p>There was an issue submitting your testimonial. Please try again or contact us directly at info@healmed.org</p>
+                <p>There was an issue submitting your testimonial. Please try again or contact us directly at vennela.gedipudi@gmail.com</p>
             </div>
         </form>
     </div>
     
+    <!-- EmailJS Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/emailjs-com/3.2.0/email.min.js"></script>
+    
     <script>
+        // Initialize EmailJS with your public key
+        // You'll need to replace 'YOUR_PUBLIC_KEY' with your actual EmailJS public key
+        emailjs.init('YOUR_PUBLIC_KEY');
+
         // Data storage array to hold all survey responses
         let surveyResponses = [];
 
@@ -535,6 +543,37 @@
             
             console.log('Response saved:', responseData);
             console.log('Total responses:', surveyResponses.length);
+        }
+
+        function sendEmailNotification(responseData) {
+            // Format services list
+            const servicesList = responseData.services || 'None selected';
+            
+            // Create email template parameters
+            const templateParams = {
+                to_email: 'vennela.gedipudi@gmail.com',
+                from_name: `${responseData.firstName} ${responseData.lastName}`,
+                from_email: responseData.email,
+                subject: 'New Patient Testimonial Survey Response',
+                patient_name: `${responseData.firstName} ${responseData.lastName}`,
+                patient_email: responseData.email,
+                patient_phone: responseData.phone || 'Not provided',
+                treatment_date: responseData.treatmentDate,
+                services_received: servicesList,
+                overall_rating: responseData.overallRating,
+                testimonial: responseData.testimonial,
+                improvements: responseData.improvements || 'None provided',
+                recommendation: responseData.recommend,
+                consent_use: responseData.consentUse,
+                consent_name: responseData.consentName,
+                consent_photo: responseData.consentPhoto,
+                consent_contact: responseData.consentContact,
+                submission_date: new Date().toLocaleString(),
+                response_id: responseData.id
+            };
+
+            // Send email using EmailJS
+            return emailjs.send('YOUR_SERVICE_ID', 'YOUR_TEMPLATE_ID', templateParams);
         }
 
         function exportToCSV() {
@@ -621,21 +660,29 @@
                     consentContact: formData.get('consent-contact') ? 'Yes' : 'No'
                 };
                 
-                // Save the response
+                // Save the response locally
                 saveResponse(responseData);
                 
-                // Simulate successful submission
-                setTimeout(() => {
-                    form.style.display = 'none';
-                    successMessage.style.display = 'block';
-                    
-                    // Reset form for next use (optional)
-                    // form.reset();
-                    // form.style.display = 'block';
-                    // successMessage.style.display = 'none';
-                    // submitBtn.disabled = false;
-                    // submitBtn.textContent = 'Submit My Testimonial';
-                }, 1000);
+                // Send email notification
+                sendEmailNotification(responseData)
+                    .then(function(response) {
+                        console.log('Email sent successfully:', response);
+                        form.style.display = 'none';
+                        successMessage.style.display = 'block';
+                        updateDataCount();
+                    })
+                    .catch(function(error) {
+                        console.error('Email sending failed:', error);
+                        // Still show success since data is saved locally
+                        form.style.display = 'none';
+                        successMessage.innerHTML = `
+                            <h3>Response Saved! 📧</h3>
+                            <p>Your testimonial has been saved. We'll process it shortly and may contact you via the email you provided.</p>
+                            <small style="opacity: 0.8;">Note: Email delivery may be delayed. Your response is securely stored.</small>
+                        `;
+                        successMessage.style.display = 'block';
+                        updateDataCount();
+                    });
                 
             } catch (error) {
                 console.error('Error saving response:', error);
