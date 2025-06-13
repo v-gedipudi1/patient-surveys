@@ -155,7 +155,7 @@
         
         .checkbox-group {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
             gap: 15px;
             margin-top: 10px;
         }
@@ -272,6 +272,16 @@
             border-radius: 10px;
             margin-top: 20px;
         }
+
+        .data-storage-info {
+            background: rgba(72, 187, 120, 0.1);
+            border: 2px solid rgba(72, 187, 120, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+            font-size: 0.9rem;
+            color: #2d3748;
+        }
         
         @media (max-width: 768px) {
             .container {
@@ -308,12 +318,7 @@
             <p>Your Experience Matters - Share Your Story</p>
         </div>
         
-        <form class="form-container" id="testimonialForm" action="https://formspree.io/f/YOUR_FORM_ID" method="POST">
-            <!-- Hidden field to specify recipient email -->
-            <input type="hidden" name="_to" value="info@healmed.org">
-            <input type="hidden" name="_subject" value="New Patient Testimonial Survey Response">
-            <input type="hidden" name="_next" value="#success">
-            
+        <form class="form-container" id="testimonialForm">
             <div class="form-group">
                 <label for="firstName">First Name <span class="required">*</span></label>
                 <input type="text" id="firstName" name="firstName" required>
@@ -369,6 +374,22 @@
                     <div class="checkbox-item">
                         <input type="checkbox" id="specialist" name="services" value="specialist-referral">
                         <label for="specialist">Specialist Referral</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="tms" name="services" value="tms-therapy">
+                        <label for="tms">TMS Therapy</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="medication" name="services" value="medication-management">
+                        <label for="medication">Medication Management</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="therapy" name="services" value="therapy-counseling">
+                        <label for="therapy">Therapy and Counseling</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="ketamine" name="services" value="ketamine">
+                        <label for="ketamine">Ketamine</label>
                     </div>
                     <div class="checkbox-item">
                         <input type="checkbox" id="other-service" name="services" value="other">
@@ -470,8 +491,13 @@
                     </label>
                 </div>
             </div>
+
+            <div class="data-storage-info">
+                <strong>📊 Data Storage:</strong> Your survey responses are automatically saved locally and can be exported as CSV. For production use, responses would be stored in a secure database.
+            </div>
             
             <button type="submit" class="submit-btn">Submit My Testimonial</button>
+            <button type="button" class="submit-btn" id="exportBtn" style="background: linear-gradient(135deg, #48bb78 0%, #38a169 100%); margin-top: 10px;">Export Stored Data</button>
             
             <div class="success-message" id="successMessage">
                 <h3>Thank You! 🎉</h3>
@@ -486,6 +512,78 @@
     </div>
     
     <script>
+        // Data storage array to hold all survey responses
+        let surveyResponses = [];
+
+        // Load existing data from memory if available
+        if (window.surveyData) {
+            surveyResponses = window.surveyData;
+        } else {
+            window.surveyData = surveyResponses;
+        }
+
+        function saveResponse(responseData) {
+            // Add timestamp and unique ID
+            responseData.id = Date.now().toString();
+            responseData.timestamp = new Date().toISOString();
+            
+            // Add to responses array
+            surveyResponses.push(responseData);
+            
+            // Update global reference
+            window.surveyData = surveyResponses;
+            
+            console.log('Response saved:', responseData);
+            console.log('Total responses:', surveyResponses.length);
+        }
+
+        function exportToCSV() {
+            if (surveyResponses.length === 0) {
+                alert('No survey data to export.');
+                return;
+            }
+
+            // Create CSV headers
+            const headers = [
+                'ID', 'Timestamp', 'First Name', 'Last Name', 'Email', 'Phone', 
+                'Treatment Date', 'Services', 'Overall Rating', 'Testimonial', 
+                'Improvements', 'Recommend', 'Consent Use', 'Consent Name', 
+                'Consent Photo', 'Consent Contact'
+            ];
+
+            // Convert data to CSV format
+            const csvContent = [
+                headers.join(','),
+                ...surveyResponses.map(response => [
+                    response.id,
+                    response.timestamp,
+                    `"${response.firstName}"`,
+                    `"${response.lastName}"`,
+                    response.email,
+                    response.phone || '',
+                    response.treatmentDate,
+                    `"${response.services}"`,
+                    response.overallRating,
+                    `"${response.testimonial.replace(/"/g, '""')}"`,
+                    `"${response.improvements.replace(/"/g, '""')}"`,
+                    response.recommend,
+                    response.consentUse,
+                    response.consentName,
+                    response.consentPhoto,
+                    response.consentContact
+                ].join(','))
+            ].join('\n');
+
+            // Create and download file
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `healmed_survey_responses_${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+
         document.getElementById('testimonialForm').addEventListener('submit', function(e) {
             e.preventDefault();
             
@@ -497,34 +595,60 @@
             submitBtn.disabled = true;
             submitBtn.textContent = 'Submitting...';
             
-            // Collect form data
-            const formData = new FormData(form);
-            
-            // For demonstration - using Formspree (you need to replace with your actual endpoint)
-            fetch('https://formspree.io/f/YOUR_FORM_ID', {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'Accept': 'application/json'
-                }
-            })
-            .then(response => {
-                if (response.ok) {
+            try {
+                // Collect form data
+                const formData = new FormData(form);
+                
+                // Collect services
+                const services = Array.from(form.querySelectorAll('input[name="services"]:checked'))
+                    .map(cb => cb.value).join(', ');
+                
+                // Create response object
+                const responseData = {
+                    firstName: formData.get('firstName'),
+                    lastName: formData.get('lastName'),
+                    email: formData.get('email'),
+                    phone: formData.get('phone') || '',
+                    treatmentDate: formData.get('treatmentDate'),
+                    services: services,
+                    overallRating: formData.get('overall-rating'),
+                    testimonial: formData.get('testimonial'),
+                    improvements: formData.get('improvements') || '',
+                    recommend: formData.get('recommend'),
+                    consentUse: formData.get('consent-use') ? 'Yes' : 'No',
+                    consentName: formData.get('consent-name') ? 'Yes' : 'No',
+                    consentPhoto: formData.get('consent-photo') ? 'Yes' : 'No',
+                    consentContact: formData.get('consent-contact') ? 'Yes' : 'No'
+                };
+                
+                // Save the response
+                saveResponse(responseData);
+                
+                // Simulate successful submission
+                setTimeout(() => {
                     form.style.display = 'none';
                     successMessage.style.display = 'block';
-                } else {
-                    throw new Error('Network response was not ok');
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
+                    
+                    // Reset form for next use (optional)
+                    // form.reset();
+                    // form.style.display = 'block';
+                    // successMessage.style.display = 'none';
+                    // submitBtn.disabled = false;
+                    // submitBtn.textContent = 'Submit My Testimonial';
+                }, 1000);
+                
+            } catch (error) {
+                console.error('Error saving response:', error);
                 errorMessage.style.display = 'block';
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Submit My Testimonial';
-            });
+            }
         });
+
+        // Export button functionality
+        document.getElementById('exportBtn').addEventListener('click', exportToCSV);
         
-        // Add some interactive feedback for form elements
+        // Add interactive feedback for form elements
         const inputs = document.querySelectorAll('input, textarea, select');
         inputs.forEach(input => {
             input.addEventListener('focus', function() {
@@ -535,57 +659,42 @@
                 this.parentElement.style.transform = 'translateY(0)';
             });
         });
+
+        // Display current data count
+        function updateDataCount() {
+            const infoDiv = document.querySelector('.data-storage-info');
+            const currentCount = surveyResponses.length;
+            infoDiv.innerHTML = `<strong>📊 Data Storage:</strong> ${currentCount} survey response(s) stored locally. Responses are automatically saved and can be exported as CSV.`;
+        }
+
+        // Update count initially and after each submission
+        updateDataCount();
         
-        // Alternative: Using EmailJS (uncomment and configure if you prefer this method)
-        /*
-        // Include EmailJS library in head: <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+        // For production environment, you would replace the in-memory storage with:
+        // 1. Send data to your server endpoint
+        // 2. Store in database (MySQL, PostgreSQL, MongoDB, etc.)
+        // 3. Use services like Google Sheets API, Airtable, or form services
         
-        document.getElementById('testimonialForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            const submitBtn = document.querySelector('.submit-btn');
-            const successMessage = document.getElementById('successMessage');
-            const errorMessage = document.getElementById('errorMessage');
-            const form = document.getElementById('testimonialForm');
-            
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Submitting...';
-            
-            // Initialize EmailJS (replace with your actual IDs)
-            emailjs.init("YOUR_PUBLIC_KEY");
-            
-            // Collect services
-            const services = Array.from(form.querySelectorAll('input[name="services"]:checked'))
-                .map(cb => cb.value).join(', ');
-            
-            const templateParams = {
-                firstName: form.firstName.value,
-                lastName: form.lastName.value,
-                email: form.email.value,
-                phone: form.phone.value,
-                treatmentDate: form.treatmentDate.value,
-                services: services,
-                overallRating: form['overall-rating'].value,
-                testimonial: form.testimonial.value,
-                improvements: form.improvements.value,
-                recommend: form.recommend.value,
-                consentUse: form['consent-use'].checked ? 'Yes' : 'No',
-                consentName: form['consent-name'].checked ? 'Yes' : 'No',
-                consentPhoto: form['consent-photo'].checked ? 'Yes' : 'No',
-                consentContact: form['consent-contact'].checked ? 'Yes' : 'No'
-            };
-            
-            emailjs.send('YOUR_SERVICE_ID', 'YOUR_TEMPLATE_ID', templateParams)
-                .then(function(response) {
-                    form.style.display = 'none';
-                    successMessage.style.display = 'block';
-                }, function(error) {
-                    console.error('EmailJS error:', error);
-                    errorMessage.style.display = 'block';
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = 'Submit My Testimonial';
-                });
+        /* Example server submission (uncomment and configure for production):
+        
+        fetch('/api/survey-responses', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(responseData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('Success:', data);
+            form.style.display = 'none';
+            successMessage.style.display = 'block';
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            errorMessage.style.display = 'block';
         });
+        
         */
     </script>
 </body>
